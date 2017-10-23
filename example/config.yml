@@ -1,0 +1,5 @@
+exporter_port: 9358 # Port on which Prometheus can call this exporter to get metrics
+log_level: info
+azure_blob_storage_account_name: ''
+azure_blob_storage_account_key: ''
+azure_blob_storage_containers: []
