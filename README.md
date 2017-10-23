@@ -18,31 +18,50 @@ Metrics will available in http://localhost:9358
 
 ```sh
 $ curl -s localhost:9358
-# HELP azure_blob_latest_file_timestamp Last modified timestamp for latest file in container
+# HELP azure_blob_latest_file_timestamp Last modified timestamp(milliseconds) for latest file in container
 # TYPE azure_blob_latest_file_timestamp gauge
-azure_blob_latest_file_timestamp{container="cassandra-backup"} 1508438059000.0
-azure_blob_latest_file_timestamp{container="postgresql-backup"} 1508448600000.0
-# HELP azure_blob_oldest_file_timestamp Last modified timestamp for oldest file in container
+azure_blob_latest_file_timestamp{container="cassandra-backup"} 1508697219000.0
+azure_blob_latest_file_timestamp{container="postgresql-backup"} 1508707802000.0
+# HELP azure_blob_oldest_file_timestamp Last modified timestamp(milliseconds) for oldest file in container
 # TYPE azure_blob_oldest_file_timestamp gauge
-azure_blob_oldest_file_timestamp{container="cassandra-backup"} 1505932457000.0
-azure_blob_oldest_file_timestamp{container="postgresql-backup"} 1505943016000.0```
+azure_blob_oldest_file_timestamp{container="cassandra-backup"} 1506191638000.0
+azure_blob_oldest_file_timestamp{container="postgresql-backup"} 1506202237000.0
+# HELP azure_blob_latest_file_size Size in bytes for latest file in container
+# TYPE azure_blob_latest_file_size gauge
+azure_blob_latest_file_size{container="cassandra-backup"} 3065762.0
+azure_blob_latest_file_size{container="postgresql-backup"} 5606443.0
+# HELP azure_blob_oldest_file_size Size in bytes for oldest file in container
+# TYPE azure_blob_oldest_file_size gauge
+azure_blob_oldest_file_size{container="cassandra-backup"} 2425517.0
+azure_blob_oldest_file_size{container="postgresql-backup"} 3392110.0
 ```
 
 ### Alert Example
 
-```
-# Example alert for daily backup
-number_of_milliseconds_in_hour = 1 * 60 * 60 * 1000
-number_of_milliseconds_in_day = 24 * number_of_milliseconds_in_hour
-# Include a slack time for backup process
-max_number_of_allowed_milliseconds =  number_of_milliseconds_in_day+ number_of_milliseconds_in_hour
+* Alert for time of latest backup. This example checks backup is created every day
 
-ALERT stale_backup
-  IF time() - azure_blob_latest_file_timestamp > max_number_of_allowed_milliseconds
+```
+# 24 hours + 1 hour slack time for backup process
+# threshold_interval_in_milliseconds => 25 * 60 * 60 * 1000 => 90000000
+ALERT backup_is_too_old
+  IF (time() * 1000) - azure_blob_latest_file_timestamp > 90000000
   FOR 5m
   ANNOTATIONS {
-      summary = "Backup is stale",
+      summary = "Backup is too old",
       description = "There is no backup file created for a day in {{ $labels.container }}",
+  }
+```
+
+* Alert for size of latest backup. This example checks latest backup file created has minimum size of 1MB
+
+```
+# threshold_size_in_bytes => 1MB => 1000000
+ALERT backup_size_is_too_small
+  IF azure_blob_latest_file_size < 1000000
+  FOR 5m
+  ANNOTATIONS {
+      summary = "Backup size is too small",
+      description = "Latest backup file is smaller than 1MB in {{ $labels.container }}",
   }
 ```
 

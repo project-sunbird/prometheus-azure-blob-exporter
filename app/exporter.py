@@ -24,17 +24,30 @@ class AzureBlobStorageCollector(object):
     azure_blob_storage_containers = self._config['azure_blob_storage_containers']
 
     blob_service = BlockBlobService(account_name=azure_blob_storage_account_name, account_key=azure_blob_storage_account_key)
-    azure_blob_latest_file_timestamp_gauge = GaugeMetricFamily('azure_blob_latest_file_timestamp', 'Last modified timestamp for latest file in container', labels=['container'])
-    azure_blob_oldest_file_timestamp_gauge = GaugeMetricFamily('azure_blob_oldest_file_timestamp', 'Last modified timestamp for oldest file in container', labels=['container'])
+    azure_blob_latest_file_timestamp_gauge = GaugeMetricFamily('azure_blob_latest_file_timestamp', 'Last modified timestamp(milliseconds) for latest file in container', labels=['container'])
+    azure_blob_oldest_file_timestamp_gauge = GaugeMetricFamily('azure_blob_oldest_file_timestamp', 'Last modified timestamp(milliseconds) for oldest file in container', labels=['container'])
+    azure_blob_latest_file_size_gauge = GaugeMetricFamily('azure_blob_latest_file_size', 'Size in bytes for latest file in container', labels=['container'])
+    azure_blob_oldest_file_size_gauge = GaugeMetricFamily('azure_blob_oldest_file_size', 'Size in bytes for oldest file in container', labels=['container'])
+
     for container in azure_blob_storage_containers:
       blobs_generator = blob_service.list_blobs(container)
-      blob_last_modified_times = [blob.properties.last_modified for blob in blobs_generator]
-      latest_file_time = max(blob_last_modified_times)
-      oldest_file_time = min(blob_last_modified_times)
-      azure_blob_latest_file_timestamp_gauge.add_metric([container], datetime_to_timestamp(latest_file_time))
-      azure_blob_oldest_file_timestamp_gauge.add_metric([container], datetime_to_timestamp(oldest_file_time))
+      blobs_sorted_from_oldest_to_latest = sorted(blobs_generator, key=lambda blob: blob.properties.last_modified)
+      if len(blobs_sorted_from_oldest_to_latest) > 0:
+        latest_file = blobs_sorted_from_oldest_to_latest[-1]
+        oldest_file = blobs_sorted_from_oldest_to_latest[0]
+        latest_file_time = latest_file.properties.last_modified
+        oldest_file_time = oldest_file.properties.last_modified
+        azure_blob_latest_file_timestamp_gauge.add_metric([container], datetime_to_timestamp(latest_file_time))
+        azure_blob_oldest_file_timestamp_gauge.add_metric([container], datetime_to_timestamp(oldest_file_time))
+        latest_file_size = latest_file.properties.content_length
+        oldest_file_size = oldest_file.properties.content_length
+        azure_blob_latest_file_size_gauge.add_metric([container], latest_file_size)
+        azure_blob_oldest_file_size_gauge.add_metric([container], oldest_file_size)
+
     yield azure_blob_latest_file_timestamp_gauge
     yield azure_blob_oldest_file_timestamp_gauge
+    yield azure_blob_latest_file_size_gauge
+    yield azure_blob_oldest_file_size_gauge
 
 
 if __name__ == "__main__":
